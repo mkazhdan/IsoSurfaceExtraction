@@ -4,7 +4,7 @@ SOURCE=IsoSurfaceExtraction.cpp
 CFLAGS += -fopenmp -Wno-deprecated
 LFLAGS += -lgomp
 
-CFLAGS_DEBUG = -DDEBUG -g3
+CFLAGS_DEBUG = -DDEBUG -g3 -std=c++11
 LFLAGS_DEBUG =
 
 CFLAGS_RELEASE = -O3 -DRELEASE -funroll-loops -ffast-math -std=c++11
