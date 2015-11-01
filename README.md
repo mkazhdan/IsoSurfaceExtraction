@@ -14,6 +14,8 @@
 <A NAME="DESCRIPTION"><B>CODE DESCRIPTION</B></A><br>
 <UL>
 The code provides an implementation of <A HREF="http://www.cs.jhu.edu/~misha/ReadingSeminar/Papers/Lorensen87.pdf">Marching-Cubes</A> isosurface extraction, supporting the use of Hermite Data and a full case table for resolving the ambiguous cases in the original implementation of Lorensen and Cline. Given a regular grid of values and a prescribed isovalue, the corresponding isosurface is extracted and output to file.
+<P>
+Implementations of Hermite interpolation on adapted octrees can also be found in the code for <A HREF="http://www.cs.jhu.edu/~misha/Code/PoissonRecon">Poisson Surface Reconstruction</A>, <A HREF="http://www.gris.informatik.tu-darmstadt.de/projects/floating-scale-surface-recon/">Floating Scale Surface Reconstruction</A>, and <A HREF="http://www.cs.jhu.edu/~misha/Code/IsoOctree/">Unconstrained Isosurface Extraction on Arbitrary Octrees</A>.
 </UL>
 <HR>
 <A NAME="EXECUTABLE"><B>EXECUTABLE ARGUMENTS</B></A><br>
