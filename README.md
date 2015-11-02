@@ -6,7 +6,7 @@
 </CENTER>
 <HR>
 <A NAME="LINKS"><B>LINKS</B></A><br>
-<A href="http://www.cs.jhu.edu/~misha/MyPapers/3DV15.pdf">3D Visualization 2015 Paper</A><br>
+<A href="http://www.cs.jhu.edu/~misha/MyPapers/3DV15.pdf">3DV 2015 Paper</A><br>
 <A href="IsoSurfaceExtraction.x64.exe">Windows Executable (x64)</A><br>
 <A href="IsoSurfaceExtraction.zip">Source Code</A><br>
 <A href="license.txt">License</A><br>
@@ -22,7 +22,7 @@ Implementations of Hermite interpolation on adapted octrees can also be found in
 <UL>
 <DL>
 
-<DT><b>--in</b> &#60;<i>input mesh</i>&#62;
+<DT><b>--in</b> &#60;<i>input volume</i>&#62;
 <DD> This string is the name of the file containing the regularly sampled voxeld values. Values are linearized, so that if the image is of resolution <I>ResX</I>*<I>ResY</I>*<I>ResY</I> then the value at index (<I>x,y,z</I>) is at position <I>x</I>+<I>y</I>*<I>ResX</I>+<I>z</I>*<I>ResX</I>*<I>ResY</I>, and are stored in binary format either as unsigned chars (1 byte per value)  or as floating point values (4 bytes per value).
 
 <DT><b>--res</b> &#60;<i>x-resolution y-resolution z-resolution</i>&#62;

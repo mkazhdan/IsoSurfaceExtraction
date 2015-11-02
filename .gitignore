@@ -1,0 +1,13 @@
+data.213x126x371.raw
+*.ply
+IsoSurfaceExtraction.exe.zip
+*.zip
+x64/Release/IsoSurfa.4CB0C4F8.tlog/cl.command.1.tlog
+*.tlog
+x64/Release/IsoSurfaceExtraction.exe
+*.obj
+x64/Release/IsoSurfaceExtraction.pdb
+*.pdb
+IsoSurfaceExtraction.v12.suo
+x64/Release/IsoSurfaceExtraction.log
+IsoSurfaceExtraction.sdf
