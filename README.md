@@ -36,7 +36,7 @@ Implementations of Hermite interpolation on adapted octrees can also be found in
 <DD> This floating point value specifies the isovalue at which the isosurface is to be extracted. (By default, the value is set to 0.)
   
 <DT>[<b>--sIters</b> &#60;<i>smoothing iterations</i>&#62;]
-<DD> This integer specified the number of (1-rint) smoothing iterations that are to be applied to the voxel grid before extracting the isosurface. (By default, the value is set to 0.)
+<DD> This integer specified the number of (1-ring) smoothing iterations that are to be applied to the voxel grid before extracting the isosurface. (By default, the value is set to 0.)
 
 <DT>[<b>--full</b>]
 <DD> If specified, the Marching-Cubes algorithm is implemented using a ``full'' case table, using the average value of face corners to resolve the amiguous case when the face is zero-crossing and the values on antipodal corners are the same.
