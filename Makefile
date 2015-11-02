@@ -21,15 +21,15 @@ MD=mkdir
 OBJECTS=$(addprefix $(BIN), $(addsuffix .o, $(basename $(SOURCE))))
 
 
-all: CFLAGS += $(CFLAGS_DEBUG)
-all: LFLAGS += $(LFLAGS_DEBUG)
+all: CFLAGS += $(CFLAGS_RELEASE)
+all: LFLAGS += $(LFLAGS_RELEASE)
 all: $(BIN)
 all: $(BIN)$(TARGET)
 
-release: CFLAGS += $(CFLAGS_RELEASE)
-release: LFLAGS += $(LFLAGS_RELEASE)
-release: $(BIN)
-release: $(BIN)$(TARGET)
+debug: CFLAGS += $(CFLAGS_DEBUG)
+debug: LFLAGS += $(LFLAGS_DEBUG)
+debug: $(BIN)
+debug: $(BIN)$(TARGET)
 
 clean:
 	rm -f $(BIN)$(TARGET)
