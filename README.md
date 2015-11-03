@@ -28,6 +28,9 @@ Implementations of Hermite interpolation on adapted octrees can also be found in
 <DT><b>--res</b> &#60;<i>x-resolution y-resolution z-resolution</i>&#62;
 <DD> This triplet of integer values gives the resolution of the voxel grid.
 
+<DT>[<b>--dim</b> &#60;<i>x-scale y-scale z-scale</i>&#62;]
+<DD> This (white-space separated) triplet of floating point values gives the scale of a voxel. (By default, the values are set to 1.)
+
 <DT>[<b>--out</b> &#60;<i>output mesh</i>&#62;]
 <DD> This string is the name of the file to which the extracted isosurface will be written. The mesh will be written in the
 <A HREF="http://www.cc.gatech.edu/projects/large_models/ply.html">PLY</A> format.
@@ -53,6 +56,9 @@ Implementations of Hermite interpolation on adapted octrees can also be found in
 <DT>[<b>--float</b>]
 <DD> If specified, the input is read in as a list of floating point values. Otherwise, the input is assumed to represent (unsigned) char values.
   
+<DT>[<b>--nonManifold</b>]
+<DD> Although the polygon mesh resulting from Marching-Cubes is manifold, it can be the case that two polygon share two vertices that are not on a polygon edge. As a result, the minimal area triangulation could introduce the same edge for the triangulation of both polygons, resulting in a triangle mesh with non-manifold edges. By default, the code will introduce an additional vertex (the plane's barycenter) if a non-manifold triangulation can arise, thereby ensuring that the output triangle mesh is manifold. Enabling this flag avoids introducing the barycenter, but could result in mesh with non-manifold edges.
+
 </UL>
 <HR>
 <A HREF="http://www.cs.jhu.edu/~misha">HOME</A>

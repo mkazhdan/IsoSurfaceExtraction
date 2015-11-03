@@ -76,9 +76,15 @@ public:
 	static int SquareToCubeEdge(const int& fIndex,const int& eIndex);
 };
 
+class MarchingEdges
+{
+public:
+	template< class Real > inline static int ValueLabel( Real value , Real isoValue ){ return value<isoValue ? 1 : 0; }
+};
 class MarchingSquares
 {
 public:
+	template< class Real > inline static int ValueLabel( Real value , Real isoValue ){ return MarchingEdges::ValueLabel< Real >( value , isoValue );  }
 	class FaceEdges
 	{
 	public:
@@ -94,10 +100,8 @@ public:
 
 	static const FaceEdges& caseTable(const int& idx);
 	static const FaceEdges& fullCaseTable(const int& idx);
-	template<class Real>
-	static int GetFullIndex(const Real values[Square::CORNERS],const Real& iso);
-	template<class Real>
-	static int GetIndex(const Real values[Square::CORNERS],const Real& iso);
+	template< class Real > static int GetFullIndex( const Real values[Square::CORNERS] , Real iso );
+	template< class Real > static int GetIndex( const Real values[Square::CORNERS] , Real iso );
 };
 
 class MarchingCubes
@@ -107,13 +111,13 @@ class MarchingCubes
 	static int __fullCaseMap[1<<(Cube::CORNERS+Cube::FACES)];
 	static std::vector< std::vector< std::vector<int> > > __fullCaseTable;
 public:
+	template< class Real > inline static int ValueLabel( Real value , Real isoValue ){ return MarchingEdges::ValueLabel< Real >( value , isoValue );  }
+	template< class Real > inline static int ValueLable( Real value , Real isoValue ){ return value<isoValue ? 1 : 0; }
 	static void SetCaseTable(void);
 	static void SetFullCaseTable(void);
 
-	template<class Real>
-	static int GetFullIndex(const Real values[Cube::CORNERS],const Real& iso);
-	template<class Real>
-	static int GetIndex(const Real values[Cube::CORNERS],const Real& iso);
+	template< class Real > static int GetFullIndex( const Real values[Cube::CORNERS] , Real iso );
+	template< class Real > static int GetIndex( const Real values[Cube::CORNERS] , Real iso );
 	static const std::vector< std::vector<int> >& caseTable(const int& idx);
 	static const std::vector< std::vector<int> >& fullCaseTable(const int& idx);
 	static const std::vector< std::vector<int> >& caseTable(const int& idx,const int& useFull);

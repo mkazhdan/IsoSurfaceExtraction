@@ -11,3 +11,6 @@ x64/Release/IsoSurfaceExtraction.pdb
 IsoSurfaceExtraction.v12.suo
 x64/Release/IsoSurfaceExtraction.log
 IsoSurfaceExtraction.sdf
+*.html
+index.html
+IsoSurfaceExtraction.opensdf

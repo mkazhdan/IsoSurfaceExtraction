@@ -328,24 +328,25 @@ int Cube::SquareToCubeEdge(const int& fIndex,const int& eIndex)
 // MarchingSquares //
 /////////////////////
 template<class Real>
-int MarchingSquares::GetIndex(const Real v[Square::CORNERS],const Real& iso){
+int MarchingSquares::GetIndex( const Real v[Square::CORNERS] , Real iso )
+{
 	int idx=0;
-	for(int i=0;i<Square::CORNERS;i++){if(v[i]<iso){idx|=(1<<i);}}
+	for( int i=0 ; i<Square::CORNERS ; i++ ) idx |= ValueLabel( v[i] , iso )<<i;
 	return idx;
 }
 template<class Real>
-int MarchingSquares::GetFullIndex(const Real v[Square::CORNERS],const Real& iso)
+int MarchingSquares::GetFullIndex( const Real v[Square::CORNERS] , Real iso )
 {
 	int idx=0;
 	Real sum=0;
 	// Corner Index
-	for(int i=0;i<Square::CORNERS;i++)
+	for( int i=0 ; i<Square::CORNERS ; i++ )
 	{
-		if(v[i]<iso){idx|=(1<<i);}
-		sum+=v[i];
+		idx |= ValueLable( v[i] , iso )<<i;
+		sum += v[i];
 	}
 	// Face Index
-	if(sum<(iso*4))	idx|=1<<Square::CORNERS;
+	idx |= ValueLable( sum , iso*4 )<<Square::CORNERS;
 	return idx;
 }
 
@@ -415,32 +416,25 @@ const MarchingSquares::FaceEdges& MarchingSquares::fullCaseTable(const int& idx)
 // MarchingCubes //
 ///////////////////
 template<class Real>
-int MarchingCubes::GetIndex(const Real v[Cube::CORNERS],const Real& iso){
+int MarchingCubes::GetIndex( const Real v[Cube::CORNERS] , Real iso )
+{
 	int idx=0;
-	for(int i=0;i<Cube::CORNERS;i++)
-		if(v[i]<iso)
-			idx|=1<<i;
+	for( int i=0 ; i<Cube::CORNERS ; i++ ) idx |= ValueLabel( v[i] , iso )<<i;
 	return idx;
 }
 template<class Real>
-int MarchingCubes::GetFullIndex(const Real values[Cube::CORNERS],const Real& iso)
+int MarchingCubes::GetFullIndex( const Real v[Cube::CORNERS] , Real iso )
 {
-	int idx=0;
-	int c1,c2,c3,c4;
-	for(int i=0;i<Cube::CORNERS;i++)
-		if(values[i]<iso)
-			idx|=1<<i;
-	if(!idx)
-		return idx;
-	if(idx==255)
-		return idx|(63<<Cube::CORNERS);
+	int idx = 0;
+	int c1 , c2 , c3 , c4;
+	for( int i=0 ; i<Cube::CORNERS ; i++ ) idx |= ValueLabel( v[i] , iso )<<i;
+	if( !idx ) return idx;
+	if( idx==255 ) return idx|(63<<Cube::CORNERS);
 
-	for(int i=0;i<Cube::FACES;i++)
+	for( int i=0 ; i<Cube::FACES ; i++ )
 	{
-		Cube::FaceCorners(i,c1,c2,c3,c4);
-		Real temp=values[c1]+values[c2]+values[c3]+values[c4];
-		if(temp<iso*4)
-			idx|=1<<(Cube::CORNERS+i);
+		Cube::FaceCorners( i , c1 , c2 , c3 , c4 );
+		idx |= ValueLable( v[c1]+v[c2]+v[c3]+v[c4] , iso*4 )<<( Cube::CORNERS + i );
 	}
 	return idx;
 }
@@ -521,15 +515,10 @@ std::vector< std::vector< std::vector<int> > > MarchingCubes::__fullCaseTable;
 
 const std::vector< std::vector <int> >& MarchingCubes::caseTable(const int& idx,const int& useFull)
 {
-	if(useFull)
-		return __fullCaseTable[__fullCaseMap[idx] ];
-	else
-		return __caseTable[idx];
+	if( useFull ) return __fullCaseTable[__fullCaseMap[idx] ];
+	else          return __caseTable[idx];
 }
-const std::vector< std::vector<int> >& MarchingCubes::fullCaseTable(const int& idx)
-{
-	return __fullCaseTable[__fullCaseMap[idx] ];
-}
+const std::vector< std::vector<int> >& MarchingCubes::fullCaseTable( const int& idx ){ return __fullCaseTable[__fullCaseMap[idx] ]; }
 void MarchingCubes::SetFullCaseTable(void)
 {
 	MarchingSquares::SetFullCaseTable();
