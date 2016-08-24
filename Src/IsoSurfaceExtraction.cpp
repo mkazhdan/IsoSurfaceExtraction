@@ -44,7 +44,7 @@ cmdLineParameterArray< int , 3 > Resolution( "res" );
 cmdLineParameter< int > SmoothIterations( "sIters" , 0 );
 cmdLineParameter< float > IsoValue( "iso" , 0.f );
 cmdLineParameterArray< float , 3 > Dimensions( "dim" , DEFAULT_DIMENSIONS );
-cmdLineReadable Float( "float" ) , FullCaseTable( "full" ) , FlipOrientation( "flip" ) , QuadraticFit( "quadratic" ) , Polygons( "polygons" ) , NonManifold( "nonManifold" ) , FlipBytes( "flip" );
+cmdLineReadable Float( "float" ) , FullCaseTable( "full" ) , FlipOrientation( "flip" ) , QuadraticFit( "quadratic" ) , Polygons( "polygons" ) , NonManifold( "nonManifold" ) , FlipBytes( "flipBytes" );
 
 cmdLineReadable* params[] = { &In , &Out , &Resolution , &IsoValue , &FullCaseTable , &FlipOrientation , &QuadraticFit , &Polygons , &SmoothIterations , &Float , &Dimensions , &NonManifold , &FlipBytes , NULL };
 
