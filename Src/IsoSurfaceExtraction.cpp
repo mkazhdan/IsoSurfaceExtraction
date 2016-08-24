@@ -44,9 +44,9 @@ cmdLineParameterArray< int , 3 > Resolution( "res" );
 cmdLineParameter< int > SmoothIterations( "sIters" , 0 );
 cmdLineParameter< float > IsoValue( "iso" , 0.f );
 cmdLineParameterArray< float , 3 > Dimensions( "dim" , DEFAULT_DIMENSIONS );
-cmdLineReadable Float( "float" ) , FullCaseTable( "full" ) , FlipOrientation( "flip" ) , QuadraticFit( "quadratic" ) , Polygons( "polygons" ) , NonManifold( "nonManifold" );
+cmdLineReadable Float( "float" ) , FullCaseTable( "full" ) , FlipOrientation( "flip" ) , QuadraticFit( "quadratic" ) , Polygons( "polygons" ) , NonManifold( "nonManifold" ) , FlipBytes( "flip" );
 
-cmdLineReadable* params[] = { &In , &Out , &Resolution , &IsoValue , &FullCaseTable , &FlipOrientation , &QuadraticFit , &Polygons , &SmoothIterations , &Float , &Dimensions , &NonManifold , NULL };
+cmdLineReadable* params[] = { &In , &Out , &Resolution , &IsoValue , &FullCaseTable , &FlipOrientation , &QuadraticFit , &Polygons , &SmoothIterations , &Float , &Dimensions , &NonManifold , &FlipBytes , NULL };
 
 void ShowUsage( const char* ex )
 {
@@ -63,6 +63,7 @@ void ShowUsage( const char* ex )
 	printf( "\t[--%s]\n" , Polygons.name );
 	printf( "\t[--%s]\n" , NonManifold.name );
 	printf( "\t[--%s]\n" , Float.name );
+	printf( "\t[--%s]\n" , FlipBytes.name );
 }
 
 float    LinearInterpolant( float x1 , float x2 , float isoValue ){ return ( isoValue-x1 ) / ( x2-x1 ); }
@@ -262,6 +263,16 @@ int main( int argc , char* argv[] )
 			fprintf( stderr , "[ERROR] Failed to read voxel grid from file.\n" );
 			return EXIT_FAILURE;
 		}
+		if( FlipBytes.set )
+		{
+			Pointer( unsigned char ) _voxelValues = ( Pointer( unsigned char ) )voxelValues;
+			for( int i=0 ; i<Resolution.values[0] * Resolution.values[1] * Resolution.values[2] ; i++ ) for( int j=0 ; j<sizeof(float)/2 ; j++ )
+			{
+				unsigned char foo = _voxelValues[ i*sizeof(float) + j ];
+				_voxelValues[ i*sizeof(float) + j ] = _voxelValues[ i*sizeof(float) + sizeof(float) - 1 - j ];
+				_voxelValues[ i*sizeof(float) + sizeof(float) - 1 - j ] = foo;
+			}
+		}
 	}
 	else
 	{
@@ -277,7 +288,15 @@ int main( int argc , char* argv[] )
 	}
 	fclose( fp );
 
+
 #define INDEX( x , y , z ) ( (x) + (y)*Resolution.values[0] + (z)*Resolution.values[0]*Resolution.values[1] )
+
+	float min , max;
+	min = max = voxelValues[0];
+	for( int x=0 ; x<Resolution.values[0] ; x++ ) for( int y=0 ; y<Resolution.values[1] ; y++ ) for( int z=0 ; z<Resolution.values[2] ; z++ )
+		min = std::min< float >( min , voxelValues[ INDEX(x,y,z) ] ) , max = std::max< float >( max , voxelValues[ INDEX(x,y,z) ] );
+	printf( "Value Range: [%f,%f]\n" , min , max );
+
 	if( SmoothIterations.value>0 )
 	{
 		float stencil[] = { 0.5f , 1.f , 0.5f };
