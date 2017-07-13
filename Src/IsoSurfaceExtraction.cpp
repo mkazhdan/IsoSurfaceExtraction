@@ -29,14 +29,19 @@ DAMAGE.
 #include <stdio.h>
 #include <stdlib.h>
 #include <omp.h>
-#include <map>
+#include <unordered_map>
 #include <algorithm>
+#include <sys/timeb.h>
+#ifndef WIN32
+#include <sys/time.h>
+#endif // WIN32
 
 #include <Src/CmdLineParser.h>
 #include <Src/Geometry.h>
 #include <Src/Ply.h>
 #include <Src/MarchingCubes.h>
 #include <Src/Array.h>
+
 
 const float DEFAULT_DIMENSIONS[] = { 1.f , 1.f , 1.f };
 cmdLineParameter< char* > In( "in" ) , Out( "out" );
@@ -65,6 +70,20 @@ void ShowUsage( const char* ex )
 	printf( "\t[--%s]\n" , Float.name );
 	printf( "\t[--%s]\n" , FlipBytes.name );
 }
+
+inline double Time( void )
+{
+#ifdef WIN32
+	struct _timeb t;
+	_ftime( &t );
+	return double( t.time ) + double( t.millitm ) / 1000.0;
+#else // WIN32
+	struct timeval t;
+	gettimeofday( &t , NULL );
+	return t.tv_sec + double( t.tv_usec ) / 1000000;
+#endif // WIN32
+}
+
 
 float    LinearInterpolant( float x1 , float x2 , float isoValue ){ return ( isoValue-x1 ) / ( x2-x1 ); }
 float QuadraticInterpolant( float x0 , float x1 , float x2 , float x3 , float isoValue )
@@ -117,98 +136,112 @@ struct IsoVertex
 	}
 #undef _ABS_
 };
-
-void ExtractIsoSurface( int resX , int resY , int resZ , ConstPointer( float ) values , float isoValue , std::vector< IsoVertex >& vertices , std::vector< std::vector< int > >& polygons , bool fullCaseTable , bool quadratic , bool flip )
+void SetFlags( int resX , int resY , ConstPointer( float ) values , float isoValue , Pointer( unsigned char ) flags )
 {
-#define INDEX( x , y , z ) ( std::min< int >( resX-1 , std::max< int >( 0 , (x) ) ) + std::min< int >( resY-1 , std::max< int >( 0 , (y) ) )*resX + std::min< int >( resZ-1 , std::max< int >( 0 , (z) ) )*resX*resY )
-	std::map< long long , int > isoVertexMap[3];
-	Pointer( unsigned char ) flags = NewPointer< unsigned char >( resX*resY*resZ );
-
-	// Mark the voxels that are larger than the iso value
 #pragma omp parallel for
-	for( int i=0 ; i<resX*resY*resZ ; i++ ) flags[i] = MarchingCubes::ValueLabel( values[i] , isoValue );
-
-	// Get the zero-crossings along the x-edges
+	for( int i=0 ; i<resX*resY ; i++ ) flags[i] = MarchingCubes::ValueLabel( values[i] , isoValue );
+}
+void SetZVertices
+(
+	int resX , int resY , int z , 
+	ConstPointer( float ) values0 , ConstPointer( float ) values1 , ConstPointer( float ) values2 , ConstPointer( float ) values3 , 
+	ConstPointer( unsigned char ) flags1 , ConstPointer( unsigned char ) flags2 , 
+	float isoValue , bool quadratic ,
+	std::unordered_map< long long , int >& isoVertexMap ,
+	std::vector< IsoVertex >& vertices
+)
+{
+#define INDEX( x , y ) ( x + (y)*resX )
 #pragma omp parallel for
-	for( int i=0 ; i<resX-1 ; i++ ) for( int j=0 ; j<resY ; j++ ) for( int k=0 ; k<resZ ; k++ )
+	for( int i=0 ; i<resX ; i++ ) for( int j=0 ; j<resY ; j++ )
 	{
-		int idx0 = INDEX( i , j , k ) , idx1 = INDEX( i+1 , j , k );
-		if( flags[idx0]!=flags[idx1] )
+		int idx = INDEX( i , j );
+		if( flags1[idx]!=flags2[idx] )
 		{
 			float iso;
-			if( quadratic )
-			{
-				int _idx0 = INDEX( i-1 , j , k ) , _idx1 = INDEX( i+2 , j , k );
-				iso = QuadraticInterpolant( values[_idx0] , values[idx0] , values[idx1] , values[_idx1] , isoValue );
-			}
-			else iso = LinearInterpolant( values[idx0] , values[idx1] , isoValue );
-			Point3D< float > p = Point3D< float >( (float)i + iso , (float)j , (float)k );
-			long long key = i + j*(resX) + k*(resX*resY);
+			if( quadratic ) iso = QuadraticInterpolant( values0 ? values0[idx] : values1[idx] , values1[idx] , values2[idx] , values3 ? values3[idx] : values2[idx] , isoValue );
+			else iso = LinearInterpolant( values1[idx] , values2[idx] , isoValue );
+			Point3D< float > p = Point3D< float >( (float)i , (float)j , (float)z + iso );
+			long long key = i + j*(resX);
 #pragma omp critical
 			{
-				isoVertexMap[0][key] = (int)vertices.size();
-				vertices.push_back( IsoVertex( p , 0 , i , j , k ) );
+				isoVertexMap[key] = (int)vertices.size();
+				vertices.push_back( IsoVertex( p , 2 , i , j , z ) );
 			}
 		}
 	}
-
-	// Get the zero-crossings along the y-edges
+#undef INDEX
+}
+void SetXYVertices
+(
+	int resX , int resY , int z , 
+	ConstPointer( float ) values ,
+	ConstPointer( unsigned char ) flags ,
+	float isoValue , bool quadratic ,
+	std::unordered_map< long long , int >& xIsoVertexMap , std::unordered_map< long long , int >& yIsoVertexMap ,
+	std::vector< IsoVertex >& vertices
+)
+{
+#define INDEX( x , y ) ( x + (y)*resX )
 #pragma omp parallel for
-	for( int i=0 ; i<resX ; i++ ) for( int j=0 ; j<resY-1 ; j++ ) for( int k=0 ; k<resZ ; k++ )
+	for( int i=0 ; i<resX-1 ; i++ ) for( int j=0 ; j<resY ; j++ )
 	{
-		int idx0 = INDEX( i , j , k ) , idx1 = INDEX( i , j+1 , k );
-		if( flags[idx0]!=flags[idx1] )
+		int idx1 = INDEX( i , j ) , idx2 = INDEX( i+1 , j );
+		if( flags[idx1]!=flags[idx2] )
 		{
 			float iso;
-			if( quadratic )
-			{
-				int _idx0 = INDEX( i , j-1 , k ) , _idx1 = INDEX( i , j+2 , k );
-				iso = QuadraticInterpolant( values[_idx0] , values[idx0] , values[idx1] , values[_idx1] , isoValue );
-			}
-			else iso = LinearInterpolant( values[idx0] , values[idx1] , isoValue );
-			Point3D< float > p = Point3D< float >( (float)i , (float)j + iso , (float)k );
-			long long key = i + j*(resX) + k*(resX*resY);
+			if( quadratic ) iso = QuadraticInterpolant( i>0 ? values[ INDEX(i-1,j) ] : values[idx1] , values[idx1] , values[idx2] , i+1<resX-1 ? values[ INDEX(i+2,j) ] : values[idx2] , isoValue );
+			else iso = LinearInterpolant( values[idx1] , values[idx2] , isoValue );
+			Point3D< float > p = Point3D< float >( (float)i + iso , (float)j , (float)z );
+			long long key = i + j*(resX);
 #pragma omp critical
 			{
-				isoVertexMap[1][key] = (int)vertices.size();
-				vertices.push_back( IsoVertex( p , 1 , i , j , k ) );
+				xIsoVertexMap[key] = (int)vertices.size();
+				vertices.push_back( IsoVertex( p , 0 , i , j , z ) );
 			}
 		}
 	}
-
-	// Get the zero-crossings along the z-edges
 #pragma omp parallel for
-	for( int i=0 ; i<resX ; i++ ) for( int j=0 ; j<resY ; j++ ) for( int k=0 ; k<resZ-1 ; k++ )
+	for( int i=0 ; i<resX ; i++ ) for( int j=0 ; j<resY-1 ; j++ )
 	{
-		int idx0 = INDEX( i , j , k ) , idx1 = INDEX( i , j , k+1 );
-		if( flags[idx0]!=flags[idx1] )
+		int idx1 = INDEX( i , j ) , idx2 = INDEX( i , j+1 );
+		if( flags[idx1]!=flags[idx2] )
 		{
 			float iso;
-			if( quadratic )
-			{
-				int _idx0 = INDEX( i , j , k-1 ) , _idx1 = INDEX( i , j , k+2 );
-				iso = QuadraticInterpolant( values[_idx0] , values[idx0] , values[idx1] , values[_idx1] , isoValue );
-			}
-			else iso = LinearInterpolant( values[idx0] , values[idx1] , isoValue );
-			Point3D< float > p = Point3D< float >( (float)i , (float)j , (float)k + iso );
-			long long key = i + j*(resX) + k*(resX*resY);
+			if( quadratic ) iso = QuadraticInterpolant( j>0 ? values[ INDEX(i,j-1) ] : values[idx1] , values[idx1] , values[idx2] , j+1<resY-1 ? values[ INDEX(i,j+2) ] : values[idx2] , isoValue );
+			else iso = LinearInterpolant( values[idx1] , values[idx2] , isoValue );
+			Point3D< float > p = Point3D< float >( (float)i , (float)j + iso , (float)z );
+			long long key = i + j*(resX);
 #pragma omp critical
 			{
-				isoVertexMap[2][key] = (int)vertices.size();
-				vertices.push_back( IsoVertex( p , 2 , i , j , k ) );
+				yIsoVertexMap[key] = (int)vertices.size();
+				vertices.push_back( IsoVertex( p , 1 , i , j , z ) );
 			}
 		}
 	}
-
-	// Iterate over the cubes and get the polygons
-	if( fullCaseTable ) MarchingCubes::SetFullCaseTable();
-	else                MarchingCubes::SetCaseTable();
-
+#undef INDEX
+}
+void SetPolygons
+(
+	int resX , int resY , int z , 
+	ConstPointer( float ) values1 , ConstPointer( float ) values2 ,
+	float isoValue , bool fullCaseTable , bool flip ,
+	const std::unordered_map< long long , int >& xIsoVertexMap1 , const std::unordered_map< long long , int >& xIsoVertexMap2 ,
+	const std::unordered_map< long long , int >& yIsoVertexMap1 , const std::unordered_map< long long , int >& yIsoVertexMap2 ,
+	const std::unordered_map< long long , int >& zIsoVertexMap ,
+	const std::vector< IsoVertex >& vertices , std::vector< std::vector< int > >& polygons
+)
+{
+#define INDEX( x , y ) ( x + (y)*resX )
 #pragma omp parallel for
-	for( int i=0 ; i<resX-1 ; i++ ) for( int j=0 ; j<resY-1 ; j++ ) for( int k=0 ; k<resZ-1 ; k++ )
+	for( int i=0 ; i<resX-1 ; i++ ) for( int j=0 ; j<resY-1 ; j++ )
 	{
 		float _values[Cube::CORNERS];
-		for( int cx=0 ; cx<2 ; cx++ ) for( int cy=0 ; cy<2 ; cy++ ) for( int cz=0 ; cz<2 ; cz++ ) _values[ Cube::CornerIndex( cx , cy , cz ) ] = values[ (i+cx) + (j+cy)*resX + (k+cz)*resX*resY ];
+		for( int cx=0 ; cx<2 ; cx++ ) for( int cy=0 ; cy<2 ; cy++ )
+		{
+			_values[ Cube::CornerIndex(cx,cy,0) ] = values1[ INDEX(i+cx,j+cy) ];
+			_values[ Cube::CornerIndex(cx,cy,1) ] = values2[ INDEX(i+cx,j+cy) ];
+		}
 		int mcIndex = fullCaseTable ? MarchingCubes::GetFullIndex( _values , isoValue ) : MarchingCubes::GetIndex( _values , isoValue );
 		const std::vector< std::vector< int > >& isoPolygons = MarchingCubes::caseTable( mcIndex , fullCaseTable );
 		for( int p=0 ; p<isoPolygons.size() ; p++ )
@@ -220,14 +253,38 @@ void ExtractIsoSurface( int resX , int resY , int resZ , ConstPointer( float ) v
 				int orientation , i1 , i2;
 				Cube::FactorEdgeIndex( isoPolygon[v] , orientation , i1 , i2 );
 				long long key;
+				std::unordered_map< long long , int >::const_iterator iter;
+				bool success;
 				switch( orientation )
 				{
-				case 0: key = (i   ) + (j+i1)*resX + (k+i2)*resX*resY ; break;
-				case 1: key = (i+i1) + (j   )*resX + (k+i2)*resX*resY ; break;
-				case 2: key = (i+i1) + (j+i2)*resX + (k   )*resX*resY ; break;
+				case 0:
+					key = (i   ) + (j+i1)*resX;
+					if( i2==0 ){ iter = xIsoVertexMap1.find( key ) ; success = iter!=xIsoVertexMap1.end(); }
+					else       { iter = xIsoVertexMap2.find( key ) ; success = iter!=xIsoVertexMap2.end(); }
+					break;
+				case 1:
+					key = (i+i1) + (j   )*resX;
+					if( i2==0 ){ iter = yIsoVertexMap1.find( key ) ; success = iter!=yIsoVertexMap1.end(); }
+					else       { iter = yIsoVertexMap2.find( key ) ; success = iter!=yIsoVertexMap2.end(); }
+					break;
+				case 2:
+					key = (i+i1) + (j+i2)*resX;
+					iter = zIsoVertexMap.find( key ) ; success = iter!=zIsoVertexMap.end();
+					break;
 				}
-				std::map< long long , int >::const_iterator iter = isoVertexMap[orientation].find( key );
-				if( iter==isoVertexMap[orientation].end() ) fprintf( stderr , "[ERROR] Couldn't find iso-vertex in map.\n" ) , exit( 0 );
+
+				if( !success )
+				{
+					fprintf( stderr , "[ERROR] Couldn't find iso-vertex in map:\n" );
+					printf( "\t%d: " , orientation );
+					switch( orientation )
+					{
+					case 0: printf( "%d %d %d\n" , i , j+i1 , z+i2 ) ; break;
+					case 1: printf( "%d %d %d\n" , i+i1 , j , z+i2 ) ; break;
+					case 2: printf( "%d %d %d\n" , i+i1 , j+i2 , z ) ; break;
+					}
+					exit( 0 );
+				}
 				if( flip ) polygon[polygon.size()-1-v] = iter->second;
 				else       polygon[v] = iter->second;
 			}
@@ -235,20 +292,37 @@ void ExtractIsoSurface( int resX , int resY , int resZ , ConstPointer( float ) v
 			polygons.push_back( polygon );
 		}
 	}
-	DeletePointer( flags );
 #undef INDEX
+}
+
+void ExtractIsoSurface( int resX , int resY , int resZ , ConstPointer( float ) values , float isoValue , std::vector< IsoVertex >& vertices , std::vector< std::vector< int > >& polygons , bool fullCaseTable , bool quadratic , bool flip )
+{
+	std::unordered_map< long long , int > xIsoVertexMap[2] , yIsoVertexMap[2] , zIsoVertexMap;
+	Pointer( unsigned char ) flags[2];
+	flags[0] = NewPointer< unsigned char >( resX*resY );
+	flags[1] = NewPointer< unsigned char >( resX*resY );
+
+	if( fullCaseTable ) MarchingCubes::SetFullCaseTable();
+	else                MarchingCubes::SetCaseTable();
+
+	SetFlags     ( resX , resY ,     values , isoValue , flags[0] );
+	SetXYVertices( resX , resY , 0 , values ,            flags[0] , isoValue , quadratic , xIsoVertexMap[0] , yIsoVertexMap[0] , vertices );
+	for( int z=0 ; z<resZ-1 ; z++ )
+	{
+		int z0 = z&1 , z1 = (z+1)&1;
+		xIsoVertexMap[z1].clear() , yIsoVertexMap[z1].clear() , zIsoVertexMap.clear();
+		SetFlags     ( resX , resY ,       values + (z+1)*resX*resY , isoValue , flags[z1] );
+		SetXYVertices( resX , resY , z+1 , values + (z+1)*resX*resY ,            flags[z1] , isoValue , quadratic , xIsoVertexMap[z1] , yIsoVertexMap[z1] , vertices );
+		SetZVertices ( resX , resY , z , z>0 ? values + (z-1)*resX*resY : NullPointer< float >() , values + z*resX*resY , values + (z+1)*resX*resY , z+1<resZ-1 ? values + (z+2)*resX*resY : NullPointer< float >() , flags[z0] , flags[z1] , isoValue , quadratic , zIsoVertexMap , vertices );
+		SetPolygons  ( resX , resY , z , values + z*resX*resY , values+(z+1)*resX*resY , isoValue , fullCaseTable , flip , xIsoVertexMap[z0] , xIsoVertexMap[z1] , yIsoVertexMap[z0] , yIsoVertexMap[z1] , zIsoVertexMap ,  vertices , polygons );
+	}
+	DeletePointer( flags[0] );
+	DeletePointer( flags[1] );
 }
 int main( int argc , char* argv[] )
 {
 	cmdLineParse( argc-1 , argv+1 , params );
-	if( !Resolution.set && !In.set ){ ShowUsage( argv[0] ) ; return EXIT_FAILURE; }
-
-	Pointer( float ) voxelValues = NewPointer< float >( Resolution.values[0] * Resolution.values[1] * Resolution.values[2] );
-	if( !voxelValues )
-	{
-		fprintf( stderr , "[ERROR] Failed to allocte voxel grid: %d x %d x %d\n" , Resolution.values[0] , Resolution.values[1] , Resolution.values[2] );
-		return EXIT_FAILURE;
-	}
+	if( !In.set ){ ShowUsage( argv[0] ) ; return EXIT_FAILURE; }
 
 	FILE* fp = fopen( In.value , "rb" );
 	if( !fp )
@@ -256,6 +330,25 @@ int main( int argc , char* argv[] )
 		fprintf( stderr , "[ERROR] Failed to open file for reading: %s\n" , In.value );
 		return EXIT_FAILURE;
 	}
+	if( !Resolution.set )
+	{
+		int res;
+		if( fread( &res , sizeof(int) , 1 ,fp )!=1 )
+		{
+			fprintf( stderr , "[ERROR] Failed to read voxel grid resolution from file.\n" );
+			return EXIT_FAILURE;
+		}
+		Resolution.values[0] = Resolution.values[1] = Resolution.values[2] = res;
+	}
+
+	Pointer( float ) voxelValues = NewPointer< float >( Resolution.values[0] * Resolution.values[1] * Resolution.values[2] );
+	if( !voxelValues )
+	{
+		fprintf( stderr , "[ERROR] Failed to allocte voxel grid: %d x %d x %d\n" , Resolution.values[0] , Resolution.values[1] , Resolution.values[2] );
+		fclose( fp );
+		return EXIT_FAILURE;
+	}
+
 	if( Float.set )
 	{
 		if( fread( voxelValues , sizeof( float ) , Resolution.values[0] * Resolution.values[1] * Resolution.values[2] , fp )!=Resolution.values[0]*Resolution.values[1]*Resolution.values[2] )
@@ -324,7 +417,9 @@ int main( int argc , char* argv[] )
 
 	std::vector< IsoVertex > vertices;
 	std::vector< std::vector< int > > polygons;
+	double t = Time();
 	ExtractIsoSurface( Resolution.values[0] , Resolution.values[1] , Resolution.values[2] , voxelValues , IsoValue.value , vertices , polygons , FullCaseTable.set , QuadraticFit.set , FlipOrientation.set );
+	printf( "Got iso-surface: %.2f(s)\n" , Time()-t );
 	DeletePointer( voxelValues );
 
 	if( Out.set )
