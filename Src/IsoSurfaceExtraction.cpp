@@ -57,7 +57,7 @@ void ShowUsage( const char* ex )
 {
 	printf( "Usage %s:\n" , ex );
 	printf( "\t --%s <input voxel grid>\n" , In.name );
-	printf( "\t --%s <input resolution>\n" , Resolution.name );
+	printf( "\t[--%s <input resolution>]\n" , Resolution.name );
 	printf( "\t[--%s <output iso-surface>]\n" , Out.name );
 	printf( "\t[--%s <iso-value>=%f]\n" , IsoValue.name , IsoValue.value );
 	printf( "\t[--%s <smoothing iterations>=%d]\n" , SmoothIterations.name , SmoothIterations.value );
